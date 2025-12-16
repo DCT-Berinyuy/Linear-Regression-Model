@@ -1,154 +1,203 @@
- Linear Regression Tutorial: Explaining main.c Line by Line
+ #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
+// Structure to hold training data
+typedef struct {
+    double *x_values;
+    double *y_values;
+    size_t size;
+} TrainingData;
 
-Linear regression is a statistical method to model the relationship between variables by fitting a straight line (or plane) to data, predicting a dependent variable (outcome) from one or more independent variables (predictors) using the least squares method to find the best-fit line that minimizes prediction errors, used widely for forecasting and understanding trends in fields from economics to machine learning
+// Structure to hold model parameters
+typedef struct {
+    double gradient;
+    double intercept;
+} LinearModel;
 
-  Code Breakdown
+/**
+ * Initialize training data with given size
+ */
+TrainingData* initialize_training_data(size_t size) {
+    if (size == 0) return NULL;
 
-  1. Header Files
+    TrainingData *data = malloc(sizeof(TrainingData));
+    if (!data) {
+        fprintf(stderr, "Error: Failed to allocate memory for training data.\n");
+        return NULL;
+    }
 
-   1 #include <math.h>
-   2 #include <stdio.h>
-   - stdio.h: For input/output functions like printf and scanf
-   - math.h: For mathematical functions like fabs (absolute value)
+    data->x_values = malloc(size * sizeof(double));
+    data->y_values = malloc(size * sizeof(double));
+    if (!data->x_values || !data->y_values) {
+        fprintf(stderr, "Error: Failed to allocate memory for data arrays.\n");
+        free(data->x_values);
+        free(data->y_values);
+        free(data);
+        return NULL;
+    }
 
-  2. Main Function Declaration
+    data->size = size;
+    return data;
+}
 
-   1 int main() {
-   - Entry point of the program
+/**
+ * Free allocated training data
+ */
+void free_training_data(TrainingData *data) {
+    if (data) {
+        free(data->x_values);
+        free(data->y_values);
+        free(data);
+    }
+}
 
-  3. Variable Declarations
+/**
+ * Get the number of training points from user input
+ */
+bool get_training_size(size_t *train_size) {
+    printf("Welcome to linear regressor!\n");
+    printf("Let's start training the model\n");
+    printf("What number of graph points do you have?\n> ");
 
-   1 size_t i, train_size = 1;
-   - i: Loop counter
-   - train_size: Number of training data points (initialized to 1 as a default)
+    int result = scanf("%zd", train_size);
+    if (result != 1 || *train_size <= 0) {
+        fprintf(stderr, "Invalid input. Number of points must be positive.\n");
+        return false;
+    }
+    return true;
+}
 
-  4. Welcome Messages and Input Collection
+/**
+ * Collect training data points from user
+ */
+bool collect_training_points(TrainingData *data) {
+    printf("Now, enter values in the form x,y. You will enter %zd of them\n", data->size);
 
-   1 printf("Welcome to linear regressor!\n");
-   2 printf("Let's start training the model\n");
-   3 printf("What number of graph points do you have?\n> ");
-   4 scanf("%zd", &train_size);
-   - Display welcome message
-   - Prompt user for number of data points
-   - Store the input in train_size
+    for (size_t i = 0; i < data->size; i++) {
+        printf("Enter point #%zd> ", i + 1);
+        int result = scanf("%lf,%lf", &data->x_values[i], &data->y_values[i]);
+        if (result != 2) {
+            fprintf(stderr, "Error: Invalid input format. Please enter values in x,y format.\n");
+            return false;
+        }
+    }
+    return true;
+}
 
-  5. Dynamic Data Storage
+/**
+ * Get training hyperparameters from user
+ */
+bool get_hyperparameters(size_t *epochs, double *learning_rate) {
+    printf("For how many epochs should we train? default 5000\n> ");
+    int result = scanf("%zd", epochs);
+    if (result != 1 || *epochs <= 0)
+        *epochs = 5000; // default value
 
-   1 double x[train_size];
-   2 double y[train_size];
-   - Declare arrays to store x and y coordinates of training data
-   - Note: This is a variable-length array based on user input
+    printf("What should be learning rate of the model? default 0.01\n> ");
+    result = scanf("%lf", learning_rate);
+    if (result != 1 || *learning_rate <= 0.0)
+        *learning_rate = 0.01; // default
 
-  6. Collecting Training Data Points
+    return true;
+}
 
-   1 printf("Now, enter continuously values in the form x,y."
-   2        " You will enter %zd of them\n",
-   3        train_size);
-   4 for (i = 0; i < train_size; i++) {
-   5   printf("Enter point #%zd> ", i + 1);
-   6   scanf("%lf,%lf", &x[i], &y[i]);
-   7 }
-   - Prompt user to enter data points in x,y format
-   - Loop through and collect each point
-   - Store x and y values in corresponding arrays
+/**
+ * Perform a single iteration of gradient descent
+ */
+double train_step(TrainingData *data, LinearModel *model, double learning_rate) {
+    double sum_errors = 0.0;
+    double gradient_sum = 0.0;
+    double intercept_sum = 0.0;
 
-  7. Initialize Model Parameters
+    // Calculate gradients for entire dataset
+    for (size_t i = 0; i < data->size; i++) {
+        // Calculate prediction: y = mx + c
+        double y_prediction = model->gradient * data->x_values[i] + model->intercept;
 
-   1 double gradient = 1.0, intercept = 0.0;
-   - Initialize slope (gradient) and y-intercept of the line
-   - These will be adjusted during training
+        // Calculate error
+        double error = y_prediction - data->y_values[i];
+        sum_errors += fabs(error);
 
-  8. Training Configuration
+        // Accumulate gradient and intercept adjustments
+        gradient_sum += error * data->x_values[i];
+        intercept_sum += error;
+    }
 
-    1 printf("For how many epochs should we train? default 5000\n> ");
-    2 size_t epochs;
-    3 scanf("%zd", &epochs);
-    4 if (epochs == 0)
-    5   epochs = 5000; // default value
-    6
-    7 printf("What should be learn rate of the model? default 0.01\n> ");
-    8 double learn_rate;
-    9 scanf("%lf", &learn_rate);
-   10 if (learn_rate == 0)
-   11   learn_rate = 0.01; // default
-   - Get number of training iterations (epochs) from user
-   - Set default if user enters 0
-   - Get learning rate from user
-   - Set default if user enters 0
+    // Apply accumulated adjustments to model parameters
+    model->gradient -= learning_rate * gradient_sum / data->size;
+    model->intercept -= learning_rate * intercept_sum / data->size;
 
-  9. Logging Configuration
+    return sum_errors;
+}
 
-   1 size_t log_epoch = epochs / 100;
-   - Calculate interval for logging progress (every 1% of total epochs)
+/**
+ * Train the linear regression model using gradient descent
+ */
+void train_model(TrainingData *data, LinearModel *model, size_t epochs, double learning_rate) {
+    size_t log_interval = (epochs > 100) ? epochs / 100 : 1;  // Log every 1% of epochs or once per epoch if less than 100
 
-  10. Training Loop
+    for (size_t epoch = 0; epoch < epochs; epoch++) {
+        double sum_errors = train_step(data, model, learning_rate);
 
-    1 for (size_t epoch = 0; epoch < epochs; epoch++) {
-    2   double sum_errors = 0;
-    3   for (i = 0; i < train_size; i++) {
-    4     // y = mx + c
-    5     double y_guess = gradient * x[i] + intercept;
-    6     // find difference with actual value
-    7     double error = y_guess - y[i];
-    8     if (error == 0)
-    9       continue;d
-   10     sum_errors += fabs(error);
-   11     // improve the gradient
-   12     gradient -= learn_rate * x[i] * error;
-   13     // improve the intercept
-   14     intercept -= learn_rate * error;
-   15   }
-   - Outer loop: iterate through training epochs
-   - Inner loop: process each training example
-   - Calculate predicted y value using current model: y = mx + c
-   - Compute error as difference between prediction and actual value
-   - Skip adjustments if error is zero (no correction needed)
-   - Accumulate absolute error to track overall loss
-   - Adjust gradient (slope) based on error and learning rate
-   - Adjust intercept based on error and learning rate
+        // Log progress at intervals
+        if ((epoch + 1) % log_interval == 0) {
+            printf("Epoch %zu, average loss is %.4lf, equation is y = %.4lfx + %.4lf\n",
+                   epoch + 1, sum_errors/data->size, model->gradient, model->intercept);
+        }
 
-  11. Progress Logging
+        // Early stopping condition
+        if (sum_errors / data->size < 0.000001) {
+            printf("Stopping training early - convergence achieved at epoch %zu\n", epoch + 1);
+            break;
+        }
+    }
+}
 
-   1 if (epoch % log_epoch == 0)
-   2   printf("epoch %zd, loss is %.4lf equation is y = %.2lfx + %.2lf\n",
-   3          epoch + 1, sum_errors, gradient, intercept);
-   - Print progress every 1% of epochs
-   - Shows current epoch, total loss, and current equation
+/**
+ * Main function implementing linear regression using gradient descent
+ */
+int main() {
+    size_t train_size;
 
-  12. Early Stopping Condition
+    // Get training size from user
+    if (!get_training_size(&train_size)) {
+        return EXIT_FAILURE;
+    }
 
-   1 if (sum_errors < 0.000001) {
-   2   printf("Stopping to train the model because the error reduced alot");
-   3   break;
-   4 }
-   - Stop training if error gets very small
-   - Indicates model has converged to a solution
+    // Initialize training data
+    TrainingData *training_data = initialize_training_data(train_size);
+    if (!training_data) {
+        return EXIT_FAILURE;
+    }
 
-  13. Final Result
+    // Collect training points from user
+    if (!collect_training_points(training_data)) {
+        free_training_data(training_data);
+        return EXIT_FAILURE;
+    }
 
-   1 printf("The equation of the line is y = %.2lfx + %.3lf", gradient, intercept);
-   2 return 0;
-   3 }
-   - Output final equation after training
-   - Return success code
+    // Get hyperparameters from user
+    size_t epochs;
+    double learning_rate;
+    if (!get_hyperparameters(&epochs, &learning_rate)) {
+        free_training_data(training_data);
+        return EXIT_FAILURE;
+    }
 
-  Explanation of the Algorithm
+    // Initialize model parameters
+    LinearModel model = {1.0, 0.0};  // Start with gradient=1.0, intercept=0.0
 
-  In the video, explain that this implements gradient descent to minimize the error between predicted and
-  actual values. The algorithm:
-   1. Makes a prediction using current parameters
-   2. Calculates the error
-   3. Adjusts parameters slightly in the direction that reduces error
-   4. Repeats many times until the model fits the data well
+    // Train the model
+    printf("\nStarting training...\n");
+    train_model(training_data, &model, epochs, learning_rate);
 
-  Key Programming Concepts to Highlight
+    // Output final result
+    printf("\nThe equation of the line is y = %.4lfx + %.4lf\n", model.gradient, model.intercept);
 
-   1. Variable-Length Arrays (VLAs): Arrays whose size is determined at runtime
-   2. Gradient Descent: Optimization algorithm that iteratively improves parameters
-   3. Learning Rate: Controls how big of steps to take during parameter updates
-   4. Epochs: Complete passes through the training dataset
+    // Clean up
+    free_training_data(training_data);
 
-
-  This tutorial covers all aspects of implementing a simple linear regression model from scratch, making it a
-  valuable resource for viewers interested in machine learning fundamentals and C programming.
+    return EXIT_SUCCESS;
+}

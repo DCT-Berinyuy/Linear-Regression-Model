@@ -1,0 +1,21 @@
+# Compiled binaries
+main
+
+# Object files
+*.o
+*.obj
+
+# Debug and build directories
+build/
+debug/
+release/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
